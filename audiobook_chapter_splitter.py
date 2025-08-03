@@ -200,13 +200,14 @@ def split_audio_file(audio_file: str, chapters: List[Tuple[str, float]], output_
     print(f"\n✓ Successfully created {len(chapters)} chapter files in '{output_dir}/'")
 
 
-def save_chapter_info(chapters: List[Tuple[str, float]], output_file: str = None, audio_file: str = None):
+def save_chapter_info(chapters: List[Tuple[str, float]], output_file: str = None, audio_file: str = None, duration: float = None):
     """Save chapter information to JSON file.
     
     Args:
         chapters: List of (chapter_name, timestamp) tuples
         output_file: Path to save JSON file (default: chapters.json next to audio file)
         audio_file: Path to the audio file (used to determine default output location)
+        duration: Total duration of the audio file in seconds
     """
     # If no output file specified and audio file provided, save next to audio file
     if output_file is None and audio_file is not None:
@@ -215,15 +216,20 @@ def save_chapter_info(chapters: List[Tuple[str, float]], output_file: str = None
     elif output_file is None:
         output_file = "chapters.json"
     
-    chapter_data = [
-        {
-            "index": i + 1,
-            "name": name,
-            "timestamp": timestamp,
-            "time_formatted": format_time(timestamp)
-        }
-        for i, (name, timestamp) in enumerate(chapters)
-    ]
+    chapter_data = {
+        "total_duration": duration if duration is not None else None,
+        "total_duration_formatted": format_time(duration) if duration is not None else None,
+        "total_chapters": len(chapters),
+        "chapters": [
+            {
+                "index": i + 1,
+                "name": name,
+                "timestamp": timestamp,
+                "time_formatted": format_time(timestamp)
+            }
+            for i, (name, timestamp) in enumerate(chapters)
+        ]
+    }
     
     # Ensure parent directory exists
     Path(output_file).parent.mkdir(exist_ok=True, parents=True)
@@ -237,6 +243,10 @@ def save_chapter_info(chapters: List[Tuple[str, float]], output_file: str = None
 def main():
     """Main function to run the chapter splitter."""
     import argparse
+    import time
+    
+    # Track start time
+    start_time = time.time()
     
     parser = argparse.ArgumentParser(description='Split audiobook into chapters using Whisper')
     parser.add_argument('audio_file', help='Path to the audiobook audio file')
@@ -257,6 +267,14 @@ def main():
         print(f"Error: Audio file '{args.audio_file}' not found")
         return
     
+    # Get audio duration
+    cmd = [
+        'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1', args.audio_file
+    ]
+    duration = float(subprocess.check_output(cmd).decode().strip())
+    print(f"Audio file duration: {format_time(duration)}")
+    
     # Transcribe audio
     transcription = transcribe_audio(args.audio_file, args.model, args.chunk_length)
     
@@ -266,24 +284,31 @@ def main():
     if not chapters:
         print("\nNo chapter markers found in transcription.")
         print("You may need to adjust the chapter patterns or review the transcription.")
+        print(f"Total audio duration: {format_time(duration)}")
         
         # Save full transcription for review
         with open('full_transcription.txt', 'w') as f:
             f.write(transcription['text'])
         print("Full transcription saved to 'full_transcription.txt' for review.")
     else:
-        print(f"\nFound {len(chapters)} chapters:")
+        print(f"\nFound {len(chapters)} chapters in {format_time(duration)} of audio:")
         for i, (name, timestamp) in enumerate(chapters, 1):
             print(f"  {i}. {name} at {format_time(timestamp)}")
         
-        # Save chapter information
-        save_chapter_info(chapters, audio_file=args.audio_file)
+        # Save chapter information with duration
+        save_chapter_info(chapters, audio_file=args.audio_file, duration=duration)
         
         # Split audio if requested
         if not args.no_split:
             split_audio_file(args.audio_file, chapters, args.output_dir)
         else:
             print("\nSkipping audio splitting (--no-split flag used)")
+        
+        print(f"\nTotal audio duration: {format_time(duration)}")
+    
+    # Calculate and display total execution time
+    execution_time = time.time() - start_time
+    print(f"\nTotal execution time: {format_time(execution_time)}")
 
 
 if __name__ == "__main__":

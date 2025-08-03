@@ -28,7 +28,7 @@ Automatically split audiobooks into chapters using OpenAI's Whisper speech recog
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone or download this repository
-cd try-whispertts
+cd sounds-chaptersplit
 
 # Create virtual environment and install dependencies
 make uv-install
@@ -38,7 +38,7 @@ make uv-install
 
 ```bash
 # Clone or download this repository
-cd try-whispertts
+cd sounds-chaptersplit
 
 # Create and activate virtual environment
 python -m venv venv
