@@ -185,14 +185,32 @@ def split_audio_file(audio_file: str, chapters: List[Tuple[str, float]], output_
         output_file = str(output_dir / f"{i+1:02d}_{safe_filename}.mp3")
         
         # Split using ffmpeg
-        cmd = [
-            'ffmpeg', '-i', audio_file,
-            '-ss', str(start_time),
-            '-to', str(end_time),
-            '-c', 'copy',  # Copy codec (no re-encoding, faster)
-            '-y',  # Overwrite output files
-            output_file
-        ]
+        # Check if we need to convert formats
+        import os
+        input_ext = os.path.splitext(audio_file)[1].lower()
+        output_ext = os.path.splitext(output_file)[1].lower()
+        
+        if input_ext in ['.m4b', '.m4a'] and output_ext == '.mp3':
+            # Need to convert from m4b/m4a to mp3
+            cmd = [
+                'ffmpeg', '-i', audio_file,
+                '-ss', str(start_time),
+                '-to', str(end_time),
+                '-c:a', 'libmp3lame',  # Convert to mp3
+                '-q:a', '2',  # Good quality (VBR ~190 kbps)
+                '-y',  # Overwrite output files
+                output_file
+            ]
+        else:
+            # Can copy codec directly
+            cmd = [
+                'ffmpeg', '-i', audio_file,
+                '-ss', str(start_time),
+                '-to', str(end_time),
+                '-c', 'copy',  # Copy codec (no re-encoding, faster)
+                '-y',  # Overwrite output files
+                output_file
+            ]
         
         print(f"Creating: {output_file} [{format_time(start_time)} - {format_time(end_time)}]")
         subprocess.run(cmd, capture_output=True, check=True)
